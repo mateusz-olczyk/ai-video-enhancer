@@ -100,7 +100,13 @@ def iter_denoised_frames(
         "-",
     ]
     frame_size = width * height * 3
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=10**8)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        bufsize=10**8,
+        start_new_session=True,
+    )
     assert proc.stdout is not None
     try:
         while True:
@@ -109,8 +115,17 @@ def iter_denoised_frames(
                 break
             yield np.frombuffer(buf, dtype=np.uint8).reshape(height, width, 3)
     finally:
-        proc.stdout.close()
-        proc.wait()
+        try:
+            proc.stdout.close()
+        except Exception:
+            pass
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
 
 class FrameEncoder:
@@ -139,23 +154,74 @@ class FrameEncoder:
             str(out_path),
         ]
         self.proc: Optional[subprocess.Popen] = None
+        self._cancelled = False
+        self._broken = False
+
+    def cancel(self) -> None:
+        """Mark the encoder as user-cancelled so non-zero ffmpeg exits in
+        __exit__ are treated as expected (no RuntimeError)."""
+        self._cancelled = True
 
     def __enter__(self) -> "FrameEncoder":
-        self.proc = subprocess.Popen(self.cmd, stdin=subprocess.PIPE, bufsize=10**8)
+        # start_new_session=True puts ffmpeg in its own process group, so a
+        # terminal Ctrl+C (SIGINT to the foreground group) is delivered only
+        # to Python -- ffmpeg keeps running until we close its stdin, and can
+        # then finalize the mp4 trailer cleanly.
+        self.proc = subprocess.Popen(
+            self.cmd,
+            stdin=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=10**8,
+            start_new_session=True,
+        )
         return self
 
     def write(self, frame: np.ndarray) -> None:
         assert self.proc is not None and self.proc.stdin is not None
         if frame.dtype != np.uint8:
             frame = frame.astype(np.uint8)
-        self.proc.stdin.write(frame.tobytes())
+        try:
+            self.proc.stdin.write(frame.tobytes())
+        except BrokenPipeError:
+            # Encoder died (e.g. disk full). Stop quietly; __exit__ surfaces
+            # the real error if there is one.
+            self._broken = True
 
     def __exit__(self, exc_type, exc, tb) -> None:
         assert self.proc is not None and self.proc.stdin is not None
-        self.proc.stdin.close()
-        rc = self.proc.wait()
-        if rc != 0 and exc_type is None:
-            raise RuntimeError(f"ffmpeg encoder exited with code {rc}")
+        try:
+            self.proc.stdin.close()
+        except BrokenPipeError:
+            self._broken = True
+        # On Ctrl+C we still want ffmpeg to finalize the trailer for whatever
+        # frames it already received, producing a playable (shorter) mp4.
+        try:
+            rc = self.proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.proc.terminate()
+            try:
+                rc = self.proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                rc = self.proc.wait()
+        stderr_bytes = b""
+        if self.proc.stderr is not None:
+            try:
+                stderr_bytes = self.proc.stderr.read() or b""
+            except Exception:
+                pass
+            finally:
+                self.proc.stderr.close()
+        # Don't surface ffmpeg failures when:
+        # - another exception is already propagating (exc_type set)
+        # - the pipeline marked us cancelled (Ctrl+C path)
+        # - our stdin pipe broke mid-stream (encoder died early; that's the
+        #   real error to surface, but only if nothing else explains it)
+        if rc != 0 and exc_type is None and not self._cancelled:
+            msg = stderr_bytes.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                f"ffmpeg encoder exited with code {rc}" + (f": {msg}" if msg else "")
+            )
 
 
 def mux_audio(video_only: Path, source_with_audio: Path, out: Path) -> None:
@@ -172,4 +238,4 @@ def mux_audio(video_only: Path, source_with_audio: Path, out: Path) -> None:
         "-shortest",
         str(out),
     ]
-    subprocess.check_call(cmd)
+    subprocess.check_call(cmd, start_new_session=True)

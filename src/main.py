@@ -7,6 +7,7 @@ Run from the repo root with the venv activated:
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from .pipeline import enhance
@@ -40,15 +41,19 @@ def main() -> None:
         p.error("--trim-end must be > 0")
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
-    enhance(
-        input_path=args.input,
-        output_path=args.output,
-        target_fps=args.target_fps,
-        strategy=args.interp_strategy,
-        denoise=not args.no_denoise,
-        scene_threshold=args.scene_threshold,
-        trim_end_sec=args.trim_end,
-    )
+    try:
+        enhance(
+            input_path=args.input,
+            output_path=args.output,
+            target_fps=args.target_fps,
+            strategy=args.interp_strategy,
+            denoise=not args.no_denoise,
+            scene_threshold=args.scene_threshold,
+            trim_end_sec=args.trim_end,
+        )
+    except KeyboardInterrupt:
+        print("cancelled by user", file=sys.stderr)
+        sys.exit(130)
 
 
 if __name__ == "__main__":

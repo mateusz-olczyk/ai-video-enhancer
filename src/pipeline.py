@@ -77,7 +77,7 @@ def _trim_input(src: Path, dst: Path, seconds: float) -> None:
         "-c:a", "copy",
         str(dst),
     ]
-    subprocess.check_call(cmd)
+    subprocess.check_call(cmd, start_new_session=True)
 
 
 def _run_pipeline(
@@ -136,15 +136,25 @@ def _run_pipeline(
         console=console,
         transient=False,
     )
+    interrupted = False
     with progress, FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
         task = progress.add_task("interp", total=len(recipes), speed=0.0)
         t0 = time.monotonic()
-        for i, frame in enumerate(_execute(recipes, src_iter, interp), start=1):
-            enc.write(frame)
-            elapsed = max(time.monotonic() - t0, 1e-6)
-            progress.update(task, advance=1, speed=i / elapsed)
+        try:
+            for i, frame in enumerate(_execute(recipes, src_iter, interp), start=1):
+                enc.write(frame)
+                elapsed = max(time.monotonic() - t0, 1e-6)
+                progress.update(task, advance=1, speed=i / elapsed)
+        except KeyboardInterrupt:
+            interrupted = True
+            enc.cancel()
+            console.log("[cancel] stopping; finalizing partial output...")
+    # Encoder context-exit above flushes the trailer so video_only.mp4 is
+    # playable even on an interrupted run.
 
     # Step 5: mux the ORIGINAL audio in unchanged (-c copy, no re-encode).
+    # `mux_audio` uses -shortest, so audio is auto-trimmed to the partial
+    # video's duration when interrupted.
     if info.has_audio:
         with console.status("[mux] copying original audio into output"):
             mux_audio(video_only, input_path, output_path)
@@ -154,6 +164,9 @@ def _run_pipeline(
             output_path.write_bytes(video_only.read_bytes())
         console.log("[mux] no audio stream; copied video only")
 
+    if interrupted:
+        console.log(f"[done] partial {output_path}")
+        raise KeyboardInterrupt
     console.log(f"[done] {output_path}")
 
 
