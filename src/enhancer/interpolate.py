@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 
 def _rife_source_dir() -> Path:
-    base = Path(os.environ.get("RIFE_MODEL_DIR", Path(__file__).resolve().parents[1] / ".cache/rife"))
+    base = Path(os.environ.get("RIFE_MODEL_DIR", Path(__file__).resolve().parents[2] / ".cache/rife"))
     return base / "Practical-RIFE"
 
 

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-video-enhancer"
+version = "0.1.0"
+description = "Interpolate video to a higher frame rate using RIFE with PyTorch (MPS/CUDA/CPU)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "numpy>=1.24",
+    "opencv-python>=4.8",
+    "scenedetect[opencv]>=0.6.3",
+    "rich>=13",
+    "imageio-ffmpeg>=0.4.9",
+    "gdown>=5.2.0",
+]
+
+[project.scripts]
+enhancer = "enhancer.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

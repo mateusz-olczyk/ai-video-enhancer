@@ -1,8 +1,9 @@
 """CLI entry point.
 
-Run from the repo root with the venv activated:
+With the package installed (``pip install -e .``) or venv activated:
 
-    python -m src.main path/to/input.mp4 -o output_60fps.mp4
+    enhancer path/to/input.mp4 -o output_60fps.mp4
+    python -m enhancer.main path/to/input.mp4 -o output_60fps.mp4
 """
 from __future__ import annotations
 

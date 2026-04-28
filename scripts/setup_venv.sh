@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates .venv, installs requirements, and wires repo-local cache env vars
+# Creates .venv, installs the package (editable, from pyproject.toml), and wires repo-local cache env vars
 # into the venv's activate script so they are exported automatically on
 # `source .venv/bin/activate`.
 set -euo pipefail
@@ -41,8 +41,8 @@ fi
 # shellcheck disable=SC1090
 source "$ACTIVATE"
 
-echo "[setup] upgrading pip + installing requirements"
+echo "[setup] upgrading pip + installing package (editable)"
 pip install --upgrade pip
-pip install -r "$REPO_ROOT/requirements.txt"
+pip install -e "$REPO_ROOT"
 
 echo "[setup] done. Activate with: source .venv/bin/activate"

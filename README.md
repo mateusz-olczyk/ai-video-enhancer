@@ -44,13 +44,19 @@ rm -rf .cache
 ## Run
 
 ```bash
-python -m src.main path/to/input.mp4 -o output_60fps.mp4
+enhancer path/to/input.mp4 -o output_60fps.mp4
+```
+
+Equivalent:
+
+```bash
+python -m enhancer.main path/to/input.mp4 -o output_60fps.mp4
 ```
 
 Quick validation run (first 5 seconds only):
 
 ```bash
-python -m src.main path/to/input.mp4 -o output_5s_60fps.mp4 --trim-end 5
+enhancer path/to/input.mp4 -o output_5s_60fps.mp4 --trim-end 5
 ```
 
 CLI flags:
@@ -75,7 +81,8 @@ CLI flags:
 ## Project layout
 
 ```
-src/
+pyproject.toml    # package metadata + enhancer console script
+src/enhancer/
   main.py          # argparse CLI
   pipeline.py      # orchestration + sliding cache
   schedule.py      # multi-stage interpolation planner
