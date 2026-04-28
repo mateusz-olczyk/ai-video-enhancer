@@ -10,6 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .console import stderr
 from .pipeline import enhance
 
 
@@ -52,7 +53,7 @@ def main() -> None:
             trim_end_sec=args.trim_end,
         )
     except KeyboardInterrupt:
-        print("cancelled by user", file=sys.stderr)
+        stderr.log("cancelled by user")
         sys.exit(130)
 
 
