@@ -1,6 +1,6 @@
 # ai-video-enhancer
 
-Upscale 24/30 fps mp4 video to 60 fps on macOS using [RIFE](https://github.com/hzwer/Practical-RIFE) (PyTorch, Apple MPS GPU).
+Upscale 24/30 fps mp4 video to 60 fps on macOS and Linux (including WSL2 Ubuntu) using [RIFE](https://github.com/hzwer/Practical-RIFE) with PyTorch acceleration (MPS/CUDA/CPU fallback).
 
 The pipeline preserves resolution and audio, applies an initial denoise pass, and uses scene-cut detection so it never morphs across cuts.
 
@@ -9,6 +9,14 @@ input.mp4 ─► ffprobe ─► hqdn3d denoise ─► PySceneDetect ─► RIFE 
 ```
 
 ## Setup (one time)
+
+System prerequisites:
+
+- macOS: `python3`, `git`, `unzip`
+- Ubuntu/WSL2: `python3`, `python3-venv`, `git`, `unzip`
+- Optional but recommended on Linux/WSL2: system `ffprobe`/`ffmpeg` for robust probing
+
+If you want GPU acceleration on WSL2 with NVIDIA, install a CUDA-enabled PyTorch build that matches your environment using the official selector at [pytorch.org](https://pytorch.org/get-started/locally/). The rest of this project setup stays the same.
 
 ```bash
 bash scripts/setup_venv.sh
@@ -25,7 +33,7 @@ bash scripts/download_model.sh
 | `TORCH_HOME` | `.cache/torch/` |
 | `HF_HOME` | `.cache/huggingface/` |
 | `RIFE_MODEL_DIR` | `.cache/rife/` |
-| `PYTORCH_ENABLE_MPS_FALLBACK` | `1` |
+| `PYTORCH_ENABLE_MPS_FALLBACK` | `1` (macOS/MPS-oriented; harmless on Linux/WSL2) |
 
 To wipe all caches and downloaded weights:
 
@@ -37,6 +45,12 @@ rm -rf .cache
 
 ```bash
 python -m src.main path/to/input.mp4 -o output_60fps.mp4
+```
+
+Quick validation run (first 5 seconds only):
+
+```bash
+python -m src.main path/to/input.mp4 -o output_5s_60fps.mp4 --trim-end 5
 ```
 
 CLI flags:
@@ -55,7 +69,7 @@ CLI flags:
    - Non-integer ratios (24→60): two-stage. Stage A inserts midpoints between every source pair (the doubled-fps stream); stage B fractional-interpolates between adjacent stage-A frames where needed. Smaller motion gaps per RIFE call than a single 0.4 / 0.8 jump from raw source.
    - Where a scene cut lies between bracketing frames, duplicate the previous frame (no morph).
 4. **Denoise + decode** via `ffmpeg -vf hqdn3d=1.5:1.5:6:6` piped as raw RGB.
-5. **Interpolate** on Apple MPS (CPU fallback automatic).
+5. **Interpolate** on Apple MPS (macOS), CUDA (Linux/WSL2 with NVIDIA), or CPU fallback.
 6. **Encode** H.264 (CRF 17) and **mux** the original audio with `-c copy`.
 
 ## Project layout
@@ -65,7 +79,7 @@ src/
   main.py          # argparse CLI
   pipeline.py      # orchestration + sliding cache
   schedule.py      # multi-stage interpolation planner
-  interpolate.py   # RIFE wrapper (MPS)
+  interpolate.py   # RIFE wrapper (MPS/CUDA/CPU selection)
   scene_detect.py  # PySceneDetect ContentDetector
   video_io.py      # ffmpeg probe/read/write/mux
 scripts/

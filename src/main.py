@@ -15,7 +15,9 @@ from .pipeline import enhance
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Upscale FPS to 60 using RIFE on Apple MPS.")
+    p = argparse.ArgumentParser(
+        description="Interpolate video to a higher frame rate using RIFE with PyTorch acceleration (MPS/CUDA/CPU)."
+    )
     p.add_argument("input", type=Path, help="input video (mp4)")
     p.add_argument("-o", "--output", type=Path, required=True, help="output video path")
     p.add_argument("--target-fps", type=float, default=60.0, help="target fps (default: 60)")

@@ -32,6 +32,7 @@ export HF_HOME="\$REPO_ROOT/.cache/huggingface"
 export MPLCONFIGDIR="\$REPO_ROOT/.cache/matplotlib"
 export RIFE_MODEL_DIR="\$REPO_ROOT/.cache/rife"
 # Allow MPS to fall back to CPU for ops not yet implemented on Apple GPU.
+# This is primarily relevant on macOS and harmless on Linux/WSL2.
 export PYTORCH_ENABLE_MPS_FALLBACK=1
 # <<< ai-video-enhancer cache env <<<
 EOF
