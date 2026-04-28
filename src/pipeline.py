@@ -7,16 +7,27 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Dict, Iterator, Optional
 
 import numpy as np
-from tqdm import tqdm
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from .interpolate import Interpolator
 from .scene_detect import detect_scene_cuts
 from .schedule import FrameKey, Recipe, build_schedule
 from .video_io import FrameEncoder, VideoInfo, ffmpeg_bin, iter_denoised_frames, mux_audio, probe
+
+console = Console(highlight=False)
 
 
 def enhance(
@@ -37,8 +48,9 @@ def enhance(
         work_input = input_path
         if trim_end_sec is not None:
             work_input = tmp / "trimmed.mp4"
-            print(f"[trim] writing first {trim_end_sec:.3f}s to temp clip")
-            _trim_input(input_path, work_input, trim_end_sec)
+            with console.status(f"[trim] writing first {trim_end_sec:.3f}s to temp clip"):
+                _trim_input(input_path, work_input, trim_end_sec)
+            console.log(f"[trim] wrote first {trim_end_sec:.3f}s to temp clip")
 
         _run_pipeline(
             input_path=work_input,
@@ -77,30 +89,33 @@ def _run_pipeline(
     denoise: bool,
     scene_threshold: float,
 ) -> None:
-    info: VideoInfo = probe(input_path)
-    print(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
+    with console.status("[probe] reading metadata"):
+        info: VideoInfo = probe(input_path)
+    console.log(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
 
     # Step 1: scene-cut detection (runs on the ORIGINAL file -- denoise would
     # smooth the signal and weaken cut detection).
-    print("[scenes] detecting cuts...")
-    cuts = detect_scene_cuts(input_path, threshold=scene_threshold)
-    print(f"[scenes] {len(cuts)} cut(s) found")
+    with console.status("[scenes] detecting cuts"):
+        cuts = detect_scene_cuts(input_path, threshold=scene_threshold)
+    console.log(f"[scenes] {len(cuts)} cut(s) found")
 
     # Step 2: build the per-output-frame recipe list. Selecting `staged` for
     # non-integer ratios (24->60) bridges the largest motion gaps via t=0.5
     # midpoint calls before the final fractional pass.
-    recipes = build_schedule(
-        src_fps=info.fps,
-        target_fps=target_fps,
-        src_num_frames=info.num_frames,
-        scene_cuts=cuts,
-        strategy=strategy,
-    )
-    print(f"[schedule] strategy={strategy} -> {len(recipes)} output frames")
+    with console.status("[schedule] building recipe"):
+        recipes = build_schedule(
+            src_fps=info.fps,
+            target_fps=target_fps,
+            src_num_frames=info.num_frames,
+            scene_cuts=cuts,
+            strategy=strategy,
+        )
+    console.log(f"[schedule] strategy={strategy} -> {len(recipes)} output frames")
 
     # Step 3: load RIFE on Apple GPU (MPS) with CPU fallback.
-    interp = Interpolator()
-    print(f"[rife] device={interp.device}")
+    with console.status("[rife] loading model"):
+        interp = Interpolator()
+    console.log(f"[rife] device={interp.device}")
 
     # Step 4: stream frames through the pipeline. We keep a small sliding
     # buffer of source frames + a cache of stage-A midpoints. The recipes
@@ -109,19 +124,37 @@ def _run_pipeline(
     src_iter = iter_denoised_frames(input_path, info.width, info.height, denoise=denoise)
 
     video_only = tmpdir / "video_only.mp4"
-    with FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
-        for frame in _execute(recipes, src_iter, interp):
+    progress = Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>5.1f}%"),
+        TimeElapsedColumn(),
+        TextColumn("<"),
+        TimeRemainingColumn(),
+        TextColumn("{task.fields[speed]:.2f} frame/s"),
+        console=console,
+        transient=False,
+    )
+    with progress, FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
+        task = progress.add_task("interp", total=len(recipes), speed=0.0)
+        t0 = time.monotonic()
+        for i, frame in enumerate(_execute(recipes, src_iter, interp), start=1):
             enc.write(frame)
+            elapsed = max(time.monotonic() - t0, 1e-6)
+            progress.update(task, advance=1, speed=i / elapsed)
 
     # Step 5: mux the ORIGINAL audio in unchanged (-c copy, no re-encode).
     if info.has_audio:
-        print("[mux] copying original audio into output")
-        mux_audio(video_only, input_path, output_path)
+        with console.status("[mux] copying original audio into output"):
+            mux_audio(video_only, input_path, output_path)
+        console.log("[mux] copied original audio into output")
     else:
-        print("[mux] no audio stream; copying video only")
-        output_path.write_bytes(video_only.read_bytes())
+        with console.status("[mux] no audio stream; copying video only"):
+            output_path.write_bytes(video_only.read_bytes())
+        console.log("[mux] no audio stream; copied video only")
 
-    print(f"[done] {output_path}")
+    console.log(f"[done] {output_path}")
 
 
 def _execute(
@@ -171,7 +204,7 @@ def _execute(
     # evict frames/midpoints we won't need again.
     max_src_after = _compute_eviction_horizon(recipes)
 
-    for idx, recipe in enumerate(tqdm(recipes, desc="interp", unit="frame")):
+    for idx, recipe in enumerate(recipes):
         if recipe.is_copy:
             yield resolve(recipe.left).copy()
         else:
