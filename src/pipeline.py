@@ -5,9 +5,10 @@ Crucial pipeline steps are commented inline as requested.
 """
 from __future__ import annotations
 
+import subprocess
 import tempfile
 from pathlib import Path
-from typing import Dict, Iterator
+from typing import Dict, Iterator, Optional
 
 import numpy as np
 from tqdm import tqdm
@@ -15,7 +16,7 @@ from tqdm import tqdm
 from .interpolate import Interpolator
 from .scene_detect import detect_scene_cuts
 from .schedule import FrameKey, Recipe, build_schedule
-from .video_io import FrameEncoder, VideoInfo, iter_denoised_frames, mux_audio, probe
+from .video_io import FrameEncoder, VideoInfo, ffmpeg_bin, iter_denoised_frames, mux_audio, probe
 
 
 def enhance(
@@ -25,6 +26,56 @@ def enhance(
     strategy: str = "auto",
     denoise: bool = True,
     scene_threshold: float = 27.0,
+    trim_end_sec: Optional[float] = None,
+) -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+
+        # Step 0 (optional): trim the input down to the first N seconds. Re-encoding
+        # (rather than -c copy) guarantees a frame-accurate cut so the schedule's
+        # source-frame indices line up with what ffmpeg actually decodes downstream.
+        work_input = input_path
+        if trim_end_sec is not None:
+            work_input = tmp / "trimmed.mp4"
+            print(f"[trim] writing first {trim_end_sec:.3f}s to temp clip")
+            _trim_input(input_path, work_input, trim_end_sec)
+
+        _run_pipeline(
+            input_path=work_input,
+            output_path=output_path,
+            tmpdir=tmp,
+            target_fps=target_fps,
+            strategy=strategy,
+            denoise=denoise,
+            scene_threshold=scene_threshold,
+        )
+
+
+def _trim_input(src: Path, dst: Path, seconds: float) -> None:
+    cmd = [
+        ffmpeg_bin(),
+        "-loglevel", "error",
+        "-y",
+        "-i", str(src),
+        "-t", f"{seconds}",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "16",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        str(dst),
+    ]
+    subprocess.check_call(cmd)
+
+
+def _run_pipeline(
+    input_path: Path,
+    output_path: Path,
+    tmpdir: Path,
+    target_fps: float,
+    strategy: str,
+    denoise: bool,
+    scene_threshold: float,
 ) -> None:
     info: VideoInfo = probe(input_path)
     print(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
@@ -57,19 +108,18 @@ def enhance(
     # remaining recipe references them.
     src_iter = iter_denoised_frames(input_path, info.width, info.height, denoise=denoise)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        video_only = Path(tmpdir) / "video_only.mp4"
-        with FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
-            for frame in _execute(recipes, src_iter, interp):
-                enc.write(frame)
+    video_only = tmpdir / "video_only.mp4"
+    with FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
+        for frame in _execute(recipes, src_iter, interp):
+            enc.write(frame)
 
-        # Step 5: mux the ORIGINAL audio in unchanged (-c copy, no re-encode).
-        if info.has_audio:
-            print("[mux] copying original audio into output")
-            mux_audio(video_only, input_path, output_path)
-        else:
-            print("[mux] no audio stream; copying video only")
-            output_path.write_bytes(video_only.read_bytes())
+    # Step 5: mux the ORIGINAL audio in unchanged (-c copy, no re-encode).
+    if info.has_audio:
+        print("[mux] copying original audio into output")
+        mux_audio(video_only, input_path, output_path)
+    else:
+        print("[mux] no audio stream; copying video only")
+        output_path.write_bytes(video_only.read_bytes())
 
     print(f"[done] {output_path}")
 

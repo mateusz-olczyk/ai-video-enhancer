@@ -25,10 +25,19 @@ def main() -> None:
     )
     p.add_argument("--no-denoise", action="store_true", help="disable hqdn3d denoise pre-filter")
     p.add_argument("--scene-threshold", type=float, default=27.0, help="PySceneDetect ContentDetector threshold")
+    p.add_argument(
+        "--trim-end",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="trim input to the first N seconds before processing (handy for quick testing)",
+    )
     args = p.parse_args()
 
     if not args.input.exists():
         p.error(f"input not found: {args.input}")
+    if args.trim_end is not None and args.trim_end <= 0:
+        p.error("--trim-end must be > 0")
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     enhance(
@@ -38,6 +47,7 @@ def main() -> None:
         strategy=args.interp_strategy,
         denoise=not args.no_denoise,
         scene_threshold=args.scene_threshold,
+        trim_end_sec=args.trim_end,
     )
 
 
