@@ -99,6 +99,8 @@ class Interpolator:
 
     def _to_tensor(self, arr: np.ndarray) -> torch.Tensor:
         # HxWx3 uint8 RGB -> 1x3xHxW float in [0,1] on device.
+        if not arr.flags.writeable:
+            arr = np.array(arr, copy=True)
         t = torch.from_numpy(arr).to(self.device, non_blocking=True)
         t = t.permute(2, 0, 1).unsqueeze(0).float() / 255.0
         return t
