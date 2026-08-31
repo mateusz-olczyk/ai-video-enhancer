@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Downloads Practical-RIFE source + v4.6 model weights into $RIFE_MODEL_DIR
-# (defaults to <repo>/.cache/rife). Idempotent: skips work that's already done.
+# Downloads the Practical-RIFE and Real-ESRGAN model weights into repo-local
+# cache directories. Idempotent: skips work that is already done.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RIFE_MODEL_DIR="${RIFE_MODEL_DIR:-$REPO_ROOT/.cache/rife}"
+REALESRGAN_MODEL_DIR="${REALESRGAN_MODEL_DIR:-$REPO_ROOT/.cache/realesrgan}"
 SRC_DIR="$RIFE_MODEL_DIR/Practical-RIFE"
 TRAIN_LOG="$SRC_DIR/train_log"
 
@@ -45,3 +46,30 @@ else
 fi
 
 echo "[rife] ready: $TRAIN_LOG/flownet.pkl"
+
+# 3) General photographic-video super-resolution weights. The official model
+# is loaded locally through Spandrel; there are no remote inference calls.
+REALESRGAN_WEIGHTS="$REALESRGAN_MODEL_DIR/RealESRGAN_x4plus.pth"
+REALESRGAN_URL="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
+
+mkdir -p "$REALESRGAN_MODEL_DIR"
+if [[ -f "$REALESRGAN_WEIGHTS" ]]; then
+  echo "[realesrgan] weights already present at $REALESRGAN_WEIGHTS"
+else
+  echo "[realesrgan] downloading RealESRGAN_x4plus weights"
+  REALESRGAN_URL="$REALESRGAN_URL" REALESRGAN_WEIGHTS="$REALESRGAN_WEIGHTS" python - <<'PY'
+import os
+import urllib.request
+from pathlib import Path
+
+destination = Path(os.environ["REALESRGAN_WEIGHTS"])
+temporary = destination.with_suffix(".pth.part")
+try:
+    urllib.request.urlretrieve(os.environ["REALESRGAN_URL"], temporary)
+    temporary.replace(destination)
+finally:
+    temporary.unlink(missing_ok=True)
+PY
+fi
+
+echo "[realesrgan] ready: $REALESRGAN_WEIGHTS"

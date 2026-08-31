@@ -1,1 +1,1 @@
-"""AI video frame-rate enhancement (RIFE + PyTorch)."""
+"""Local AI video resolution and frame-rate enhancement."""

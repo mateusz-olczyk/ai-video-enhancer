@@ -1,5 +1,5 @@
 """End-to-end orchestration: probe -> denoise -> scene detect -> schedule
--> RIFE interpolation -> encode -> mux original audio.
+-> optional Real-ESRGAN enhancement -> RIFE interpolation -> encode -> audio.
 
 Crucial pipeline steps are commented inline as requested.
 """
@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator, Optional
 
 import numpy as np
 
@@ -17,6 +17,7 @@ from .console import make_pipeline_progress, stdout
 from .interpolate import Interpolator
 from .scene_detect import detect_scene_cuts
 from .schedule import FrameKey, Recipe, build_schedule
+from .upscale import Upscaler, target_dimensions
 from .video_io import FrameEncoder, VideoInfo, ffmpeg_bin, iter_denoised_frames, mux_audio, probe
 
 
@@ -24,6 +25,7 @@ def enhance(
     input_path: Path,
     output_path: Path,
     target_fps: float = 60.0,
+    resolution: Optional[str] = None,
     strategy: str = "auto",
     denoise: bool = True,
     scene_threshold: float = 27.0,
@@ -47,6 +49,7 @@ def enhance(
             output_path=output_path,
             tmpdir=tmp,
             target_fps=target_fps,
+            resolution=resolution,
             strategy=strategy,
             denoise=denoise,
             scene_threshold=scene_threshold,
@@ -75,6 +78,7 @@ def _run_pipeline(
     output_path: Path,
     tmpdir: Path,
     target_fps: float,
+    resolution: Optional[str],
     strategy: str,
     denoise: bool,
     scene_threshold: float,
@@ -82,6 +86,17 @@ def _run_pipeline(
     with stdout.status("[probe] reading metadata"):
         info: VideoInfo = probe(input_path)
     stdout.log(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
+    output_width, output_height = target_dimensions(
+        info.width,
+        info.height,
+        resolution,
+    )
+    should_upscale = (output_width, output_height) != (info.width, info.height)
+    if resolution is not None and not should_upscale:
+        stdout.log(
+            f"[upscale] source already matches {resolution}; preserving "
+            f"{info.width}x{info.height}"
+        )
 
     # Step 1: scene-cut detection (runs on the ORIGINAL file -- denoise would
     # smooth the signal and weaken cut detection).
@@ -107,6 +122,15 @@ def _run_pipeline(
         interp = Interpolator()
     stdout.log(f"[rife] device={interp.device}")
 
+    upscaler: Upscaler | None = None
+    if should_upscale:
+        with stdout.status("[upscale] loading Real-ESRGAN model"):
+            upscaler = Upscaler(device=interp.device)
+        stdout.log(
+            f"[upscale] Real-ESRGAN {info.width}x{info.height} -> "
+            f"{output_width}x{output_height} on {upscaler.device}"
+        )
+
     # Step 4: stream frames through the pipeline. We keep a small sliding
     # buffer of source frames + a cache of stage-A midpoints. The recipes
     # arrive in temporal order, so we can evict source frames once no
@@ -116,11 +140,41 @@ def _run_pipeline(
     video_only = tmpdir / "video_only.mp4"
     progress = make_pipeline_progress()
     interrupted = False
-    with progress, FrameEncoder(video_only, info.width, info.height, target_fps) as enc:
+    with progress, FrameEncoder(video_only, output_width, output_height, target_fps) as enc:
         task = progress.add_task("interp", total=len(recipes), speed=0.0)
+        upscale_task = (
+            progress.add_task("upscale", total=info.num_frames, speed=0.0)
+            if upscaler is not None
+            else None
+        )
         t0 = time.monotonic()
+        upscale_started = time.monotonic()
+        upscaled_frames = 0
+
+        def on_upscale() -> None:
+            nonlocal upscaled_frames
+            if upscale_task is None:
+                return
+            upscaled_frames += 1
+            elapsed = max(time.monotonic() - upscale_started, 1e-6)
+            progress.update(
+                upscale_task,
+                advance=1,
+                speed=upscaled_frames / elapsed,
+            )
+
         try:
-            for i, frame in enumerate(_execute(recipes, src_iter, interp), start=1):
+            for i, frame in enumerate(
+                _execute(
+                    recipes,
+                    src_iter,
+                    interp,
+                    upscaler=upscaler,
+                    output_dimensions=(output_width, output_height),
+                    on_upscale=on_upscale,
+                ),
+                start=1,
+            ):
                 enc.write(frame)
                 elapsed = max(time.monotonic() - t0, 1e-6)
                 progress.update(task, advance=1, speed=i / elapsed)
@@ -153,6 +207,9 @@ def _execute(
     recipes,
     src_iter: Iterator[np.ndarray],
     interp: Interpolator,
+    upscaler: Optional[Upscaler] = None,
+    output_dimensions: Optional[tuple[int, int]] = None,
+    on_upscale: Optional[Callable[[], None]] = None,
 ) -> Iterator[np.ndarray]:
     """Walk recipes in order, lazily pulling source frames and caching
     midpoints. Yields the synthesized output frame for each recipe.
@@ -175,6 +232,12 @@ def _execute(
                 src_buf[next_src_idx] = src_buf[last]
                 next_src_idx += 1
                 continue
+            if upscaler is not None:
+                if output_dimensions is None:
+                    raise ValueError("output_dimensions are required with an upscaler")
+                frame = upscaler.upscale(frame, *output_dimensions)
+                if on_upscale is not None:
+                    on_upscale()
             src_buf[next_src_idx] = frame
             next_src_idx += 1
         return src_buf[i]

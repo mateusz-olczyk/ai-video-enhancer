@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-video-enhancer"
 version = "0.1.0"
-description = "Interpolate video to a higher frame rate using RIFE with PyTorch (MPS/CUDA/CPU)."
+description = "Locally enhance video resolution and frame rate with Real-ESRGAN and RIFE."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -17,6 +17,7 @@ dependencies = [
     "rich>=13",
     "imageio-ffmpeg>=0.4.9",
     "gdown>=5.2.0",
+    "spandrel>=0.4.2",
 ]
 
 [project.scripts]
