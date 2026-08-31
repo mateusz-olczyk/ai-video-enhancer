@@ -124,8 +124,10 @@ class Upscaler:
                 pad_left = max(0, left - self.tile_pad)
                 pad_right = min(src_width, right + self.tile_pad)
 
-                patch = np.ascontiguousarray(
-                    frame[pad_top:pad_bottom, pad_left:pad_right]
+                patch = np.array(
+                    frame[pad_top:pad_bottom, pad_left:pad_right],
+                    copy=True,
+                    order="C",
                 )
                 tensor = torch.from_numpy(patch).to(
                     device=self.device,

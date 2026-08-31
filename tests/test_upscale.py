@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import warnings
 
 import numpy as np
 import torch
@@ -40,6 +41,7 @@ class _NearestX2:
 class TiledUpscalerTests(unittest.TestCase):
     def test_tiled_inference_stitches_without_seams(self) -> None:
         frame = np.arange(5 * 7 * 3, dtype=np.uint8).reshape(5, 7, 3)
+        frame.setflags(write=False)
         upscaler = Upscaler.__new__(Upscaler)
         upscaler.device = torch.device("cpu")
         upscaler.dtype = torch.float32
@@ -48,10 +50,13 @@ class TiledUpscalerTests(unittest.TestCase):
         upscaler.tile_size = 3
         upscaler.tile_pad = 1
 
-        actual = upscaler.upscale(frame, width=14, height=10)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            actual = upscaler.upscale(frame, width=14, height=10)
         expected = np.repeat(np.repeat(frame, 2, axis=0), 2, axis=1)
 
         np.testing.assert_array_equal(actual, expected)
+        self.assertFalse(any("not writable" in str(item.message) for item in caught))
 
 
 if __name__ == "__main__":
