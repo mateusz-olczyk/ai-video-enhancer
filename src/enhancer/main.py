@@ -4,6 +4,7 @@ With the package installed (``pip install -e .``) or venv activated:
 
     enhancer path/to/input.mp4 -o output_60fps.mp4
     python -m enhancer.main path/to/input.mp4 -o output_60fps.mp4
+    enhancer path/to/input.mp4 -o output_4k_60fps.mp4 --resolution 4k
 """
 from __future__ import annotations
 
@@ -17,7 +18,10 @@ from .pipeline import enhance
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Interpolate video to a higher frame rate using RIFE with PyTorch acceleration (MPS/CUDA/CPU)."
+        description=(
+            "Locally enhance video frame rate with RIFE and optionally enhance "
+            "resolution with Real-ESRGAN (MPS/CUDA/CPU)."
+        )
     )
     p.add_argument("input", type=Path, help="input video (mp4)")
     p.add_argument("-o", "--output", type=Path, required=True, help="output video path")
