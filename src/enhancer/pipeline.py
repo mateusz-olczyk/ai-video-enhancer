@@ -104,10 +104,7 @@ def _run_pipeline(
     )
     should_upscale = (output_width, output_height) != (info.width, info.height)
     if resolution is not None and not should_upscale:
-        stdout.log(
-            f"[upscale] source already matches {resolution}; preserving "
-            f"{info.width}x{info.height}"
-        )
+        stdout.log(f"[upscale] source already matches {resolution}; preserving " f"{info.width}x{info.height}")
 
     # Step 1: scene-cut detection (runs on the ORIGINAL file -- denoise would
     # smooth the signal and weaken cut detection).
@@ -153,11 +150,7 @@ def _run_pipeline(
     interrupted = False
     with progress, FrameEncoder(video_only, output_width, output_height, target_fps) as enc:
         task = progress.add_task("interp", total=len(recipes), speed=0.0)
-        upscale_task = (
-            progress.add_task("upscale", total=info.num_frames, speed=0.0)
-            if upscaler is not None
-            else None
-        )
+        upscale_task = progress.add_task("upscale", total=info.num_frames, speed=0.0) if upscaler is not None else None
         t0 = time.monotonic()
         upscale_started = time.monotonic()
         upscaled_frames = 0

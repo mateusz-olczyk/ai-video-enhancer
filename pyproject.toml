@@ -35,7 +35,7 @@ enhancer = "enhancer.main:main"
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["imageio_ffmpeg", "scenedetect", "scenedetect.*"]
+module = ["imageio_ffmpeg", "scenedetect", "scenedetect.*", "spandrel", "spandrel.*"]
 ignore_missing_imports = true
 
 [tool.black]

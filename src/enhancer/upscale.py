@@ -4,6 +4,7 @@ The model runs on the same PyTorch device selection used by RIFE. Inference is
 tiled so 4K targets do not require the complete source frame to be resident in
 GPU memory at once.
 """
+
 from __future__ import annotations
 
 import os
@@ -14,7 +15,6 @@ import cv2
 import numpy as np
 import torch
 from spandrel import ImageModelDescriptor, ModelLoader
-
 
 TARGET_HEIGHTS: Final[dict[str, int]] = {
     "720p": 720,
@@ -79,10 +79,7 @@ class Upscaler:
     ) -> None:
         path = model_path or _model_path()
         if not path.exists():
-            raise FileNotFoundError(
-                f"Real-ESRGAN weights not found at {path}. "
-                "Run scripts/download_model.sh first."
-            )
+            raise FileNotFoundError(f"Real-ESRGAN weights not found at {path}. " "Run scripts/download_model.sh first.")
 
         descriptor = ModelLoader().load_from_file(path)
         if not isinstance(descriptor, ImageModelDescriptor):
@@ -91,11 +88,7 @@ class Upscaler:
             raise ValueError(f"model at {path} does not increase resolution")
 
         self.device = device or _select_device()
-        self.dtype = (
-            torch.float16
-            if self.device.type == "cuda" and descriptor.supports_half
-            else torch.float32
-        )
+        self.dtype = torch.float16 if self.device.type == "cuda" and descriptor.supports_half else torch.float32
         self.model = descriptor.to(device=self.device, dtype=self.dtype).eval()
         self.scale = int(descriptor.scale)
         self.tile_size = max(32, int(tile_size))
@@ -136,15 +129,7 @@ class Upscaler:
                 )
                 tensor = tensor.permute(2, 0, 1).unsqueeze(0) / 255.0
                 enhanced = self.model(tensor).clamp_(0, 1)
-                enhanced = (
-                    (enhanced * 255.0)
-                    .byte()
-                    .squeeze(0)
-                    .permute(1, 2, 0)
-                    .contiguous()
-                    .cpu()
-                    .numpy()
-                )
+                enhanced = (enhanced * 255.0).byte().squeeze(0).permute(1, 2, 0).contiguous().cpu().numpy()
 
                 crop_top = (top - pad_top) * self.scale
                 crop_bottom = crop_top + (bottom - top) * self.scale
