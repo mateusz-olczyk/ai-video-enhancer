@@ -42,8 +42,11 @@ fi
 # shellcheck disable=SC1090
 source "$ACTIVATE"
 
-echo "[setup] upgrading pip + installing package (editable)"
+echo "[setup] upgrading pip + installing package and development tools (editable)"
 pip install --upgrade pip
-pip install -e "$REPO_ROOT"
+pip install -e "$REPO_ROOT[dev]"
+
+echo "[setup] installing pre-commit hooks"
+pre-commit install
 
 echo "[setup] done. Activate with: source .venv/bin/activate"
