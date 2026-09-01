@@ -3,6 +3,7 @@
 
 Crucial pipeline steps are commented inline as requested.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -59,15 +60,23 @@ def enhance(
 def _trim_input(src: Path, dst: Path, seconds: float) -> None:
     cmd = [
         ffmpeg_bin(),
-        "-loglevel", "error",
+        "-loglevel",
+        "error",
         "-y",
-        "-i", str(src),
-        "-t", f"{seconds}",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "16",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-i",
+        str(src),
+        "-t",
+        f"{seconds}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "16",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "copy",
         str(dst),
     ]
     subprocess.check_call(cmd, start_new_session=True)
@@ -85,7 +94,9 @@ def _run_pipeline(
 ) -> None:
     with stdout.status("[probe] reading metadata"):
         info: VideoInfo = probe(input_path)
-    stdout.log(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
+    stdout.log(
+        f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}"
+    )
     output_width, output_height = target_dimensions(
         info.width,
         info.height,

@@ -37,6 +37,7 @@ mypy_path = "src"
 [tool.black]
 line-length = 120
 skip-magic-trailing-comma = false
+target-version = ["py310"]
 
 [tool.isort]
 profile = "black"

@@ -3,6 +3,7 @@
 Loads Practical-RIFE (cloned by scripts/download_model.sh) and runs inference
 on Apple's MPS GPU when available, with graceful CPU fallback.
 """
+
 from __future__ import annotations
 
 import os
@@ -36,9 +37,7 @@ class Interpolator:
         self.device = device or _select_device()
         src = _rife_source_dir()
         if not (src / "train_log" / "flownet.pkl").exists():
-            raise FileNotFoundError(
-                f"RIFE weights not found under {src}. Run scripts/download_model.sh first."
-            )
+            raise FileNotFoundError(f"RIFE weights not found under {src}. Run scripts/download_model.sh first.")
         # Inject Practical-RIFE into sys.path so its `train_log.RIFE_HDv3` import works.
         if str(src) not in sys.path:
             sys.path.insert(0, str(src))

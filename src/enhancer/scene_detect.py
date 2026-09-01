@@ -4,12 +4,13 @@ Returns the set of source-frame indices that START a new scene. We use this
 in the schedule to AVOID interpolating across cuts (which would produce
 ghastly morph artefacts) and instead duplicate the previous frame.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Set
 
-from scenedetect import open_video, SceneManager
+from scenedetect import SceneManager, open_video
 from scenedetect.detectors import ContentDetector
 
 

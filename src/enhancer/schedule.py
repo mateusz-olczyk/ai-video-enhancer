@@ -15,6 +15,7 @@ Strategy choice:
                 any other ratio with `target % src == 0` -> direct copies +
                 midpoints; everything else -> direct fractional.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ class FrameKey:
     src_a + 1 == src_b -> midpoint synthesized between two source frames
     (the "doubled-fps" stage frame).
     """
+
     src_a: int
     src_b: int
 
@@ -40,6 +42,7 @@ class FrameKey:
 @dataclass
 class Recipe:
     """How to produce a single output frame."""
+
     left: FrameKey
     right: FrameKey
     t: float  # 0.0 -> emit left as-is; 1.0 -> emit right; else interpolate
