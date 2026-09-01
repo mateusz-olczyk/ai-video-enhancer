@@ -1,0 +1,64 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Unit tests and model weights
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Restore model cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/rife
+            .cache/realesrgan
+          key: ${{ runner.os }}-video-models-${{ hashFiles('scripts/download_model.sh') }}
+
+      - name: Download model weights
+        run: bash scripts/download_model.sh
+
+      - name: Verify downloaded models
+        run: |
+          test -s .cache/rife/Practical-RIFE/train_log/flownet.pkl
+          test -s .cache/realesrgan/RealESRGAN_x4plus.pth
+          python - <<'PY'
+          import numpy as np
+          import torch
+
+          from enhancer.interpolate import Interpolator
+          from enhancer.upscale import Upscaler
+
+          Interpolator(device=torch.device("cpu"))
+          upscaler = Upscaler(device=torch.device("cpu"), tile_size=32)
+          output = upscaler.upscale(np.zeros((4, 6, 3), dtype=np.uint8), 12, 8)
+          assert output.shape == (8, 12, 3)
+          PY
+
+      - name: Run unit tests
+        run: PYTHONWARNINGS=error python -m unittest discover -s tests -v
+
+      - name: Validate Python and shell syntax
+        run: |
+          python -m compileall -q src tests
+          bash -n scripts/setup_venv.sh scripts/download_model.sh

@@ -9,7 +9,7 @@ VENV_DIR="$REPO_ROOT/.venv"
 CACHE_DIR="$REPO_ROOT/.cache"
 ACTIVATE="$VENV_DIR/bin/activate"
 
-mkdir -p "$CACHE_DIR"/{pip,torch,huggingface,rife,matplotlib}
+mkdir -p "$CACHE_DIR"/{pip,torch,huggingface,rife,realesrgan,matplotlib}
 
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "[setup] creating venv at $VENV_DIR"
@@ -31,6 +31,7 @@ export TORCH_HOME="\$REPO_ROOT/.cache/torch"
 export HF_HOME="\$REPO_ROOT/.cache/huggingface"
 export MPLCONFIGDIR="\$REPO_ROOT/.cache/matplotlib"
 export RIFE_MODEL_DIR="\$REPO_ROOT/.cache/rife"
+export REALESRGAN_MODEL_DIR="\$REPO_ROOT/.cache/realesrgan"
 # Allow MPS to fall back to CPU for ops not yet implemented on Apple GPU.
 # This is primarily relevant on macOS and harmless on Linux/WSL2.
 export PYTORCH_ENABLE_MPS_FALLBACK=1

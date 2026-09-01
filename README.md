@@ -1,19 +1,25 @@
 # ai-video-enhancer
 
-Upscale 24/30 fps mp4 video to 60 fps on macOS and Linux (including WSL2 Ubuntu) using [RIFE](https://github.com/hzwer/Practical-RIFE) with PyTorch acceleration (MPS/CUDA/CPU fallback).
+Enhance mp4 video frame rate and, optionally, resolution on macOS and Linux
+(including WSL2 Ubuntu). The local pipeline uses
+[Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) for resolution and
+[RIFE](https://github.com/hzwer/Practical-RIFE) for frame interpolation, with
+PyTorch acceleration (MPS/CUDA/CPU fallback).
 
-The pipeline preserves resolution and audio, applies an initial denoise pass, and uses scene-cut detection so it never morphs across cuts.
+Without `--resolution`, the pipeline preserves the source resolution. It
+always preserves audio, applies an initial denoise pass, and uses scene-cut
+detection so it never morphs across cuts.
 
 ```text
-input.mp4 ─► ffprobe ─► hqdn3d denoise ─► PySceneDetect ─► RIFE (staged) ─► H.264 + original audio ─► output.mp4
+input.mp4 ─► ffprobe / PySceneDetect ─► hqdn3d ─► Real-ESRGAN (optional) ─► RIFE ─► H.264 + original audio ─► output.mp4
 ```
 
 ## Setup (one time)
 
 System prerequisites:
 
-- macOS: `python3`, `git`, `unzip`
-- Ubuntu/WSL2: `python3`, `python3-venv`, `git`, `unzip`
+- macOS: `python3`, `git`, `unzip`, `curl`
+- Ubuntu/WSL2: `python3`, `python3-venv`, `git`, `unzip`, `curl`
 - Optional but recommended on Linux/WSL2: system `ffprobe`/`ffmpeg` for robust probing
 
 If you want GPU acceleration on WSL2 with NVIDIA, install a CUDA-enabled PyTorch build that matches your environment using the official selector at [pytorch.org](https://pytorch.org/get-started/locally/). The rest of this project setup stays the same.
@@ -33,6 +39,7 @@ bash scripts/download_model.sh
 | `TORCH_HOME` | `.cache/torch/` |
 | `HF_HOME` | `.cache/huggingface/` |
 | `RIFE_MODEL_DIR` | `.cache/rife/` |
+| `REALESRGAN_MODEL_DIR` | `.cache/realesrgan/` |
 | `PYTORCH_ENABLE_MPS_FALLBACK` | `1` (macOS/MPS-oriented; harmless on Linux/WSL2) |
 
 To wipe all caches and downloaded weights:
@@ -45,6 +52,12 @@ rm -rf .cache
 
 ```bash
 enhancer path/to/input.mp4 -o output_60fps.mp4
+```
+
+Enhance a 720p source to 4K and 60 fps:
+
+```bash
+enhancer path/to/input.mp4 -o output_4k_60fps.mp4 --resolution 4k
 ```
 
 Equivalent:
@@ -61,7 +74,11 @@ enhancer path/to/input.mp4 -o output_5s_60fps.mp4 --trim-end 5
 
 CLI flags:
 
+- `--version` — print the package name and version, then exit.
 - `--target-fps` (default `60`)
+- `--resolution {720p,1080p,4k}` — locally enhance to the named progressive
+  resolution (`4k` is 2160p), preserving aspect ratio. Omit the flag to
+  preserve the source dimensions. A target lower than the source is rejected.
 - `--interp-strategy {auto,direct,staged}` — `auto` picks `staged` for non-integer ratios (e.g. 24→60) and `direct` for integer ratios (e.g. 30→60).
 - `--no-denoise` — skip the `hqdn3d` pre-filter.
 - `--scene-threshold` — PySceneDetect `ContentDetector` threshold (default `27`).
@@ -75,8 +92,18 @@ CLI flags:
    - Non-integer ratios (24→60): two-stage. Stage A inserts midpoints between every source pair (the doubled-fps stream); stage B fractional-interpolates between adjacent stage-A frames where needed. Smaller motion gaps per RIFE call than a single 0.4 / 0.8 jump from raw source.
    - Where a scene cut lies between bracketing frames, duplicate the previous frame (no morph).
 4. **Denoise + decode** via `ffmpeg -vf hqdn3d=1.5:1.5:6:6` piped as raw RGB.
-5. **Interpolate** on Apple MPS (macOS), CUDA (Linux/WSL2 with NVIDIA), or CPU fallback.
-6. **Encode** H.264 (CRF 17) and **mux** the original audio with `-c copy`.
+5. **Enhance resolution** when requested, using tiled Real-ESRGAN x4 inference.
+   The x4 result is resized to the exact target while preserving aspect ratio.
+   A separate Rich progress row reports completed source frames and throughput.
+6. **Interpolate** on Apple MPS (macOS), CUDA (Linux/WSL2 with NVIDIA), or CPU fallback.
+7. **Encode** H.264 (CRF 17) and **mux** the original audio with `-c copy`.
+
+Resolution enhancement runs before interpolation. This means Real-ESRGAN only
+processes original source frames instead of every generated 60-fps frame, and
+RIFE estimates motion from the enhanced detail. The tradeoff is that 4K RIFE
+needs more device memory. Both models run entirely on the local machine. The
+setup script downloads model weights, but processing never calls an external
+model API.
 
 ## Project layout
 
@@ -87,6 +114,7 @@ src/enhancer/
   pipeline.py      # orchestration + sliding cache
   schedule.py      # multi-stage interpolation planner
   interpolate.py   # RIFE wrapper (MPS/CUDA/CPU selection)
+  upscale.py       # tiled Real-ESRGAN resolution enhancement
   scene_detect.py  # PySceneDetect ContentDetector
   video_io.py      # ffmpeg probe/read/write/mux
 scripts/
