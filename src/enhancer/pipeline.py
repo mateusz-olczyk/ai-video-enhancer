@@ -3,7 +3,6 @@
 
 Crucial pipeline steps are commented inline as requested.
 """
-from __future__ import annotations
 
 import subprocess
 import tempfile
@@ -59,15 +58,23 @@ def enhance(
 def _trim_input(src: Path, dst: Path, seconds: float) -> None:
     cmd = [
         ffmpeg_bin(),
-        "-loglevel", "error",
+        "-loglevel",
+        "error",
         "-y",
-        "-i", str(src),
-        "-t", f"{seconds}",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "16",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-i",
+        str(src),
+        "-t",
+        f"{seconds}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "16",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "copy",
         str(dst),
     ]
     subprocess.check_call(cmd, start_new_session=True)
@@ -85,7 +92,9 @@ def _run_pipeline(
 ) -> None:
     with stdout.status("[probe] reading metadata"):
         info: VideoInfo = probe(input_path)
-    stdout.log(f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}")
+    stdout.log(
+        f"[probe] {info.width}x{info.height} @ {info.fps:.3f}fps  frames={info.num_frames}  audio={info.has_audio}"
+    )
     output_width, output_height = target_dimensions(
         info.width,
         info.height,
@@ -93,10 +102,7 @@ def _run_pipeline(
     )
     should_upscale = (output_width, output_height) != (info.width, info.height)
     if resolution is not None and not should_upscale:
-        stdout.log(
-            f"[upscale] source already matches {resolution}; preserving "
-            f"{info.width}x{info.height}"
-        )
+        stdout.log(f"[upscale] source already matches {resolution}; preserving " f"{info.width}x{info.height}")
 
     # Step 1: scene-cut detection (runs on the ORIGINAL file -- denoise would
     # smooth the signal and weaken cut detection).
@@ -142,11 +148,7 @@ def _run_pipeline(
     interrupted = False
     with progress, FrameEncoder(video_only, output_width, output_height, target_fps) as enc:
         task = progress.add_task("interp", total=len(recipes), speed=0.0)
-        upscale_task = (
-            progress.add_task("upscale", total=info.num_frames, speed=0.0)
-            if upscaler is not None
-            else None
-        )
+        upscale_task = progress.add_task("upscale", total=info.num_frames, speed=0.0) if upscaler is not None else None
         t0 = time.monotonic()
         upscale_started = time.monotonic()
         upscaled_frames = 0
@@ -269,12 +271,12 @@ def _execute(
 
         # Evict caches: drop source frames whose index < min_needed_from_now.
         min_needed = max_src_after[idx]
-        for k in list(src_buf):
-            if k < min_needed:
-                del src_buf[k]
-        for k in list(mid_cache):
-            if k.src_b < min_needed:
-                del mid_cache[k]
+        for source_index in list(src_buf):
+            if source_index < min_needed:
+                del src_buf[source_index]
+        for midpoint_key in list(mid_cache):
+            if midpoint_key.src_b < min_needed:
+                del mid_cache[midpoint_key]
 
 
 def _compute_eviction_horizon(recipes) -> list[int]:

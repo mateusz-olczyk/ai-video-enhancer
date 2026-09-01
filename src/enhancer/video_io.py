@@ -3,7 +3,6 @@
 Uses the ffmpeg binary bundled with `imageio-ffmpeg` so users don't need a
 system-wide ffmpeg install on macOS.
 """
-from __future__ import annotations
 
 import json
 import shutil
@@ -42,8 +41,14 @@ def probe(path: Path) -> VideoInfo:
     if probe_cmd:
         out = subprocess.check_output(
             [
-                probe_cmd, "-v", "error", "-print_format", "json",
-                "-show_streams", "-show_format", str(path),
+                probe_cmd,
+                "-v",
+                "error",
+                "-print_format",
+                "json",
+                "-show_streams",
+                "-show_format",
+                str(path),
             ],
             text=True,
         )
@@ -59,11 +64,10 @@ def probe(path: Path) -> VideoInfo:
         return VideoInfo(int(video["width"]), int(video["height"]), fps, nb_frames, audio)
 
     # Fallback: parse ffmpeg -i stderr
-    proc = subprocess.run(
-        [ffmpeg_bin(), "-i", str(path)], capture_output=True, text=True
-    )
+    proc = subprocess.run([ffmpeg_bin(), "-i", str(path)], capture_output=True, text=True)
     err = proc.stderr
     import re
+
     m_dim = re.search(r"(\d{2,5})x(\d{2,5})", err)
     m_fps = re.search(r"(\d+(?:\.\d+)?)\s+fps", err)
     m_dur = re.search(r"Duration:\s+(\d+):(\d+):(\d+\.\d+)", err)
@@ -76,9 +80,7 @@ def probe(path: Path) -> VideoInfo:
     return VideoInfo(w, h, fps, int(round(dur * fps)), has_audio)
 
 
-def iter_denoised_frames(
-    path: Path, width: int, height: int, denoise: bool = True
-) -> Iterator[np.ndarray]:
+def iter_denoised_frames(path: Path, width: int, height: int, denoise: bool = True) -> Iterator[np.ndarray]:
     """Yield decoded frames as HxWx3 uint8 RGB numpy arrays.
 
     A `hqdn3d` filter is applied here as the initial noise-cancellation step:
@@ -92,11 +94,16 @@ def iter_denoised_frames(
 
     cmd = [
         ffmpeg_bin(),
-        "-loglevel", "error",
-        "-i", str(path),
-        "-vf", vf,
-        "-f", "rawvideo",
-        "-pix_fmt", "rgb24",
+        "-loglevel",
+        "error",
+        "-i",
+        str(path),
+        "-vf",
+        vf,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
         "-",
     ]
     frame_size = width * height * 3
@@ -139,18 +146,29 @@ class FrameEncoder:
         # CRF 17 is visually near-lossless; pix_fmt yuv420p for broad compat.
         self.cmd = [
             ffmpeg_bin(),
-            "-loglevel", "error",
+            "-loglevel",
+            "error",
             "-y",
-            "-f", "rawvideo",
-            "-pix_fmt", "rgb24",
-            "-s", f"{width}x{height}",
-            "-r", f"{fps}",
-            "-i", "-",
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", str(crf),
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{width}x{height}",
+            "-r",
+            f"{fps}",
+            "-i",
+            "-",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            str(crf),
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
             str(out_path),
         ]
         self.proc: Optional[subprocess.Popen] = None
@@ -219,22 +237,26 @@ class FrameEncoder:
         #   real error to surface, but only if nothing else explains it)
         if rc != 0 and exc_type is None and not self._cancelled:
             msg = stderr_bytes.decode("utf-8", errors="replace").strip()
-            raise RuntimeError(
-                f"ffmpeg encoder exited with code {rc}" + (f": {msg}" if msg else "")
-            )
+            raise RuntimeError(f"ffmpeg encoder exited with code {rc}" + (f": {msg}" if msg else ""))
 
 
 def mux_audio(video_only: Path, source_with_audio: Path, out: Path) -> None:
     """Copy audio from source into the new video, no re-encode."""
     cmd = [
         ffmpeg_bin(),
-        "-loglevel", "error",
+        "-loglevel",
+        "error",
         "-y",
-        "-i", str(video_only),
-        "-i", str(source_with_audio),
-        "-map", "0:v:0",
-        "-map", "1:a:0?",
-        "-c", "copy",
+        "-i",
+        str(video_only),
+        "-i",
+        str(source_with_audio),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0?",
+        "-c",
+        "copy",
         "-shortest",
         str(out),
     ]

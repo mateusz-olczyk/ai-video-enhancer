@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import unittest
 
 import numpy as np
@@ -25,10 +23,7 @@ class _FakeInterpolator:
         timestep: float,
     ) -> np.ndarray:
         self.input_shape = frame_a.shape
-        return (
-            frame_a.astype(np.float32) * (1.0 - timestep)
-            + frame_b.astype(np.float32) * timestep
-        ).astype(np.uint8)
+        return (frame_a.astype(np.float32) * (1.0 - timestep) + frame_b.astype(np.float32) * timestep).astype(np.uint8)
 
 
 class PipelineResolutionTests(unittest.TestCase):

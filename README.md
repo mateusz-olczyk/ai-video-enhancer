@@ -30,7 +30,8 @@ source .venv/bin/activate
 bash scripts/download_model.sh
 ```
 
-`setup_venv.sh` injects cache env vars into the venv's activate script so all caches/models live under `<repo>/.cache/`:
+`setup_venv.sh` installs the package and development tools, installs the repository's pre-commit hooks,
+and injects cache env vars into the venv's activate script so all caches/models live under `<repo>/.cache/`:
 
 | Var | Value |
 | --- | --- |

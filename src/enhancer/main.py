@@ -6,7 +6,6 @@ With the package installed (``pip install -e .``) or venv activated:
     python -m enhancer.main path/to/input.mp4 -o output_60fps.mp4
     enhancer path/to/input.mp4 -o output_4k_60fps.mp4 --resolution 4k
 """
-from __future__ import annotations
 
 import argparse
 import sys

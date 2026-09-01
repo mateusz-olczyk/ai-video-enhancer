@@ -20,8 +20,32 @@ dependencies = [
     "spandrel>=0.4.2",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "black>=26.5.1",
+    "isort>=9.0.1",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+]
+
 [project.scripts]
 enhancer = "enhancer.main:main"
+
+[tool.mypy]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["imageio_ffmpeg", "scenedetect", "scenedetect.*", "spandrel", "spandrel.*"]
+ignore_missing_imports = true
+
+[tool.black]
+line-length = 120
+skip-magic-trailing-comma = false
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
 
 [tool.setuptools.packages.find]
 where = ["src"]
