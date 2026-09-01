@@ -1,0 +1,5 @@
+{
+  "name": "ai-video-enhancer",
+  "user": "ubuntu",
+  "install": "bash scripts/cloud_setup.sh"
+}
