@@ -34,6 +34,10 @@ enhancer = "enhancer.main:main"
 [tool.mypy]
 mypy_path = "src"
 
+[[tool.mypy.overrides]]
+module = ["imageio_ffmpeg", "scenedetect", "scenedetect.*"]
+ignore_missing_imports = true
+
 [tool.black]
 line-length = 120
 skip-magic-trailing-comma = false

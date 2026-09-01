@@ -280,12 +280,12 @@ def _execute(
 
         # Evict caches: drop source frames whose index < min_needed_from_now.
         min_needed = max_src_after[idx]
-        for k in list(src_buf):
-            if k < min_needed:
-                del src_buf[k]
-        for k in list(mid_cache):
-            if k.src_b < min_needed:
-                del mid_cache[k]
+        for source_index in list(src_buf):
+            if source_index < min_needed:
+                del src_buf[source_index]
+        for midpoint_key in list(mid_cache):
+            if midpoint_key.src_b < min_needed:
+                del mid_cache[midpoint_key]
 
 
 def _compute_eviction_horizon(recipes) -> list[int]:
