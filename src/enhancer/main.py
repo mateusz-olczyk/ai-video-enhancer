@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 from .console import stderr
@@ -22,6 +23,11 @@ def main() -> None:
             "Locally enhance video frame rate with RIFE and optionally enhance "
             "resolution with Real-ESRGAN (MPS/CUDA/CPU)."
         )
+    )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"ai-video-enhancer {version('ai-video-enhancer')}",
     )
     p.add_argument("input", type=Path, help="input video (mp4)")
     p.add_argument("-o", "--output", type=Path, required=True, help="output video path")

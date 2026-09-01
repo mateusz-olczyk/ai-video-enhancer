@@ -74,6 +74,7 @@ enhancer path/to/input.mp4 -o output_5s_60fps.mp4 --trim-end 5
 
 CLI flags:
 
+- `--version` — print the package name and version, then exit.
 - `--target-fps` (default `60`)
 - `--resolution {720p,1080p,4k}` — locally enhance to the named progressive
   resolution (`4k` is 2160p), preserving aspect ratio. Omit the flag to
