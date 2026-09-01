@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from enhancer.pipeline import PipelineMetrics, _execute
+from enhancer.pipeline import _execute
 from enhancer.schedule import FrameKey, Recipe
 
 
@@ -48,21 +48,25 @@ class PipelineResolutionTests(unittest.TestCase):
         )
         upscaler = _FakeUpscaler()
         interpolator = _FakeInterpolator()
-        metrics = PipelineMetrics()
+        progress_updates = 0
+
+        def on_upscale() -> None:
+            nonlocal progress_updates
+            progress_updates += 1
 
         output = list(
             _execute(
                 recipes,
                 source_frames,
                 interpolator,  # type: ignore[arg-type]
-                metrics=metrics,
                 upscaler=upscaler,  # type: ignore[arg-type]
                 output_dimensions=(4, 4),
+                on_upscale=on_upscale,
             )
         )
 
         self.assertEqual(upscaler.calls, 2)
-        self.assertEqual(metrics.upscale_frames, 2)
+        self.assertEqual(progress_updates, 2)
         self.assertEqual(interpolator.input_shape, (4, 4, 3))
         self.assertEqual([int(frame[0, 0, 0]) for frame in output], [10, 11, 12])
 
