@@ -18,8 +18,8 @@ input.mp4 ─► ffprobe / PySceneDetect ─► hqdn3d ─► Real-ESRGAN (optio
 
 System prerequisites:
 
-- macOS: `python3`, `git`, `unzip`
-- Ubuntu/WSL2: `python3`, `python3-venv`, `git`, `unzip`
+- macOS: `python3`, `git`, `unzip`, `curl`
+- Ubuntu/WSL2: `python3`, `python3-venv`, `git`, `unzip`, `curl`
 - Optional but recommended on Linux/WSL2: system `ffprobe`/`ffmpeg` for robust probing
 
 If you want GPU acceleration on WSL2 with NVIDIA, install a CUDA-enabled PyTorch build that matches your environment using the official selector at [pytorch.org](https://pytorch.org/get-started/locally/). The rest of this project setup stays the same.
@@ -39,6 +39,7 @@ bash scripts/download_model.sh
 | `TORCH_HOME` | `.cache/torch/` |
 | `HF_HOME` | `.cache/huggingface/` |
 | `RIFE_MODEL_DIR` | `.cache/rife/` |
+| `REALESRGAN_MODEL_DIR` | `.cache/realesrgan/` |
 | `PYTORCH_ENABLE_MPS_FALLBACK` | `1` (macOS/MPS-oriented; harmless on Linux/WSL2) |
 
 To wipe all caches and downloaded weights:
@@ -92,16 +93,16 @@ CLI flags:
 4. **Denoise + decode** via `ffmpeg -vf hqdn3d=1.5:1.5:6:6` piped as raw RGB.
 5. **Enhance resolution** when requested, using tiled Real-ESRGAN x4 inference.
    The x4 result is resized to the exact target while preserving aspect ratio.
+   A separate Rich progress row reports completed source frames and throughput.
 6. **Interpolate** on Apple MPS (macOS), CUDA (Linux/WSL2 with NVIDIA), or CPU fallback.
 7. **Encode** H.264 (CRF 17) and **mux** the original audio with `-c copy`.
 
 Resolution enhancement runs before interpolation. This means Real-ESRGAN only
 processes original source frames instead of every generated 60-fps frame, and
 RIFE estimates motion from the enhanced detail. The tradeoff is that 4K RIFE
-needs more device memory; keep `--interp-batch-size 1` for 4K unless the GPU
-has enough headroom. Both models run entirely on the local machine. The setup
-script downloads model weights, but processing never calls an external model
-API.
+needs more device memory. Both models run entirely on the local machine. The
+setup script downloads model weights, but processing never calls an external
+model API.
 
 ## Project layout
 

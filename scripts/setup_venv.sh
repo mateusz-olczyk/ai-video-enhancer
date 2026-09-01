@@ -39,13 +39,6 @@ export PYTORCH_ENABLE_MPS_FALLBACK=1
 EOF
 fi
 
-# Older venvs may already have the main marker without this newer model cache.
-if ! grep -q '^export REALESRGAN_MODEL_DIR=' "$ACTIVATE"; then
-  cat >> "$ACTIVATE" <<EOF
-export REALESRGAN_MODEL_DIR="\$REPO_ROOT/.cache/realesrgan"
-EOF
-fi
-
 # shellcheck disable=SC1090
 source "$ACTIVATE"
 

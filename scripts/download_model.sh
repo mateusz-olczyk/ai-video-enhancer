@@ -56,20 +56,15 @@ mkdir -p "$REALESRGAN_MODEL_DIR"
 if [[ -f "$REALESRGAN_WEIGHTS" ]]; then
   echo "[realesrgan] weights already present at $REALESRGAN_WEIGHTS"
 else
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[realesrgan] ERROR: curl is required to download model weights." >&2
+    exit 1
+  fi
   echo "[realesrgan] downloading RealESRGAN_x4plus weights"
-  REALESRGAN_URL="$REALESRGAN_URL" REALESRGAN_WEIGHTS="$REALESRGAN_WEIGHTS" python - <<'PY'
-import os
-import urllib.request
-from pathlib import Path
-
-destination = Path(os.environ["REALESRGAN_WEIGHTS"])
-temporary = destination.with_suffix(".pth.part")
-try:
-    urllib.request.urlretrieve(os.environ["REALESRGAN_URL"], temporary)
-    temporary.replace(destination)
-finally:
-    temporary.unlink(missing_ok=True)
-PY
+  TEMP_WEIGHTS="$REALESRGAN_WEIGHTS.part"
+  rm -f "$TEMP_WEIGHTS"
+  curl --fail --location --retry 3 --output "$TEMP_WEIGHTS" "$REALESRGAN_URL"
+  mv "$TEMP_WEIGHTS" "$REALESRGAN_WEIGHTS"
 fi
 
 echo "[realesrgan] ready: $REALESRGAN_WEIGHTS"
