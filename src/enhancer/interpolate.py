@@ -4,8 +4,6 @@ Loads Practical-RIFE (cloned by scripts/download_model.sh) and runs inference
 on Apple's MPS GPU when available, with graceful CPU fallback.
 """
 
-from __future__ import annotations
-
 import os
 import sys
 from pathlib import Path

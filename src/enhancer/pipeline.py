@@ -4,8 +4,6 @@
 Crucial pipeline steps are commented inline as requested.
 """
 
-from __future__ import annotations
-
 import subprocess
 import tempfile
 import time

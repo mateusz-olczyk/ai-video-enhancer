@@ -1,7 +1,5 @@
 """Shared Rich console and progress UI for CLI and pipeline."""
 
-from __future__ import annotations
-
 import sys
 
 from rich.console import Console

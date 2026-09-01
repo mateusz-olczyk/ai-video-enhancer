@@ -4,8 +4,6 @@ Uses the ffmpeg binary bundled with `imageio-ffmpeg` so users don't need a
 system-wide ffmpeg install on macOS.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 import subprocess

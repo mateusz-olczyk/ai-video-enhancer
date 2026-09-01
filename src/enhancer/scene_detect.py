@@ -5,8 +5,6 @@ in the schedule to AVOID interpolating across cuts (which would produce
 ghastly morph artefacts) and instead duplicate the previous frame.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Set
 

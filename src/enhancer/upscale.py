@@ -5,8 +5,6 @@ tiled so 4K targets do not require the complete source frame to be resident in
 GPU memory at once.
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 from typing import Final

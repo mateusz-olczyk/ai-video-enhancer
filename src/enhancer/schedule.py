@@ -16,8 +16,6 @@ Strategy choice:
                 midpoints; everything else -> direct fractional.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import List, Set
 
